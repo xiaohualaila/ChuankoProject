@@ -1,9 +1,12 @@
-package com.shuli.root.chuankoproject;
+package com.shuli.root.chuankoproject.activity;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.widget.TextView;
+
+import com.shuli.root.chuankoproject.R;
+
 import org.json.JSONObject;
 import butterknife.ButterKnife;
 import butterknife.OnClick;

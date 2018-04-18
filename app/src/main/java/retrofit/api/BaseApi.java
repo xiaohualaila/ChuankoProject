@@ -17,9 +17,9 @@ import rx.Observable;
  */
 public interface BaseApi {
 
-    @POST("get")
+    @POST("venousInfoAdd")
     Observable<JSONObject> uploadPhotoBase(
-            @Query("hhh") byte[] regTemplateData
+            @Query("venousInfo") byte[] regTemplateData
     );
 
 
