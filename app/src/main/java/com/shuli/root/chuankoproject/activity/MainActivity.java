@@ -7,21 +7,31 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.google.gson.Gson;
 import com.shuli.root.chuankoproject.R;
+import com.shuli.root.chuankoproject.util.MyUtil;
 import com.shuli.root.chuankoproject.util.SoundPoolUtil;
-
 import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 
 import WedoneBioVein.SdkMain;
 import WedoneBioVein.UserData;
 import WedoneBioVein.VeinMatchCaller;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
 import retrofit.Api;
 import retrofit.ConnectUrl;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 import rx.schedulers.Schedulers;
-
 import static java.lang.Thread.sleep;
 
 public class MainActivity extends AppCompatActivity {
@@ -36,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     int mVeinDevCnt = 0;
 
     private TextView textView;
+    String cmd ="chmod 777 /dev/ttyttyS3";
 
     Handler handler = new Handler(){
         @Override
@@ -49,10 +60,29 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         textView = findViewById(R.id.textView);
-
+        exeShell(cmd);
         InitOperations();
         doBtnEnumDevice();
     }
+    public void exeShell(String cmd){
+
+        try{
+            Process p = Runtime.getRuntime().exec(cmd);
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(
+                            p.getInputStream()));
+            String line = null;
+            while ((line = in.readLine()) != null) {
+                Log.i("exeShell",line);
+            }
+
+        }
+        catch(Throwable t)
+        {
+            t.printStackTrace();
+        }
+    }
+
     //初始化
     private void InitOperations(){
         if(null == mSdkMain){
@@ -107,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if(0 >= mVeinDevCnt){
-                Log.i("sss","不存在有效的指静脉设备，请先进行枚举设备操作！");
+                DisplayNoticeMsg("不存在有效的指静脉设备！", 0);
                 return;
             }else {
                 Log.i("sss","枚举设备成功！" +msg);
@@ -125,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
     public void doBtnInitDevice() {
         int retVal;
 
-        String devId = null, msg = "";
+        String devId = null;
         for(int devIdx = 0; devIdx < mVeinDevCnt; devIdx++){
             devId = new String(mVeinDevIdList[devIdx]);
             if(0 == devId.trim().length()) {
@@ -133,17 +163,17 @@ public class MainActivity extends AppCompatActivity {
             }
 
             retVal = mSdkMain.FV_InitDevice(mVeinDevIdList[devIdx]);//初始化设备
-            retVal = mSdkMain.FV_OpenDevice(mVeinDevIdList[devIdx]);//打开设备按钮
-            if(mSdkMain.FV_ERRCODE_SUCCESS == retVal){
-                retVal = mSdkMain.FV_OpenDevice(mVeinDevIdList[devIdx]);
-                if(mSdkMain.FV_ERRCODE_SUCCESS == retVal){
-                    msg += "{" + devId + ":成功}";
+            if(mSdkMain.FV_ERRCODE_SUCCESS == retVal) {
+                retVal = mSdkMain.FV_OpenDevice(mVeinDevIdList[devIdx]);//打开设备按钮
+                if (mSdkMain.FV_ERRCODE_SUCCESS == retVal) {
+                    if (mSdkMain.FV_ERRCODE_SUCCESS == retVal) {
+                        DisplayNoticeMsg("设备初始化成功！", 0);
+                    } else {
+                        DisplayNoticeMsg("设备初始化失败！", 0);
+                    }
                 }
-            } else{
-                msg += "{" + devId + ":err=" + retVal + "}";
             }
         }
-        Log.i("sss","初始化设备：" + msg);
         return;
     }
 
@@ -189,6 +219,7 @@ public class MainActivity extends AppCompatActivity {
         if (0 >= mVeinDevCnt) {
 
             Log.i("sss","不存在有效的指静脉设备，请先进行枚举设备操作！");
+            DisplayNoticeMsg("不存在有效的指静脉设备，请先进行枚举设备操作！", 0);
             return;
         }
         if (mRegUserData.D_USER_TEMPLATE_NUM <= mRegUserData.GetTemplateNum()) {
@@ -311,7 +342,14 @@ public class MainActivity extends AppCompatActivity {
                         // TODO: 2018/4/18 将获取到的模板数组上传服务器
                         byte[] regTemplateData = mRegUserData.TemplateData(); //获取注册采集的特征数据
 
-                        upload(regTemplateData);
+                        MessageFinger messageFinger = new MessageFinger();
+                        messageFinger.setRegTemplateData(regTemplateData);
+                        messageFinger.setName("xxxxx");
+                        Gson gson = new Gson();
+                        String postInfoStr = gson.toJson(messageFinger);
+                        Log.i("sss","postInfoStr" + postInfoStr);
+                        upload(postInfoStr);
+
                         break; //采集完成3个有效模板，则结束采集
                     }
                 }
@@ -319,6 +357,7 @@ public class MainActivity extends AppCompatActivity {
         }).start();
         return;
     }
+
 
    Runnable runnable = new Runnable() {
        @Override
@@ -604,9 +643,10 @@ public class MainActivity extends AppCompatActivity {
         return;
     }
 
-    private void upload(byte[] regTemplateData){
+    private void upload(String json){
+        RequestBody body = RequestBody.create(MediaType.parse("application/json; charset=utf-8"),json);
         Api.getBaseApiWithOutFormat(ConnectUrl.URL)
-                .uploadPhotoBase(regTemplateData)
+                .uploadPhotoBase3(body)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Action1<JSONObject>() {
@@ -624,6 +664,7 @@ public class MainActivity extends AppCompatActivity {
                            }
                 );
     }
+
 }
 
 
