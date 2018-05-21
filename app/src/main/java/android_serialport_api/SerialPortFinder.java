@@ -62,19 +62,20 @@ public class SerialPortFinder {
 	Vector<Driver> getDrivers() throws IOException {
 		if (mDrivers == null) {
 			mDrivers = new Vector<Driver>();
-			LineNumberReader r = new LineNumberReader(new FileReader("/proc/tty/drivers"));
-			String l;
-			while((l = r.readLine()) != null) {
-				// Issue 3:
-				// Since driver name may contain spaces, we do not extract driver name with split()
-				String drivername = l.substring(0, 0x15).trim();
-				String[] w = l.split(" +");
-				if ((w.length >= 5) && (w[w.length-1].equals("serial"))) {
-					Log.d(TAG, "Found new driver " + drivername + " on " + w[w.length-4]);
-					mDrivers.add(new Driver(drivername, w[w.length-4]));
-				}
-			}
-			r.close();
+//			LineNumberReader r = new LineNumberReader(new FileReader("/proc/tty/drivers"));
+//			String l;
+//			while((l = r.readLine()) != null) {
+//				// Issue 3:
+//				// Since driver name may contain spaces, we do not extract driver name with split()
+//				String drivername = l.substring(0, 0x15).trim();
+//				String[] w = l.split(" +");
+//				if ((w.length >= 5) && (w[w.length-1].equals("serial"))) {
+//					Log.d(TAG, "Found new driver " + drivername + " on " + w[w.length-4]);
+//					mDrivers.add(new Driver(drivername, w[w.length-4]));
+//				}
+//			}
+			mDrivers.add(new Driver("g_serial", "/dev/ttyS3"));
+			//r.close();
 		}
 		return mDrivers;
 	}
@@ -128,9 +129,9 @@ public class SerialPortFinder {
             itdriv = getDrivers().iterator();
             while(itdriv.hasNext()) {
                 Driver driver = itdriv.next();
-                if(0 != driver.getName().toUpperCase().compareTo("UART")){
-                    continue;
-                }
+//                if(0 != driver.getName().toUpperCase().compareTo("UART")){
+//                    continue;
+//                }
                 Iterator<File> itdev = driver.getDevices().iterator();
                 while(itdev.hasNext()) {
                     String device = itdev.next().getAbsolutePath();
