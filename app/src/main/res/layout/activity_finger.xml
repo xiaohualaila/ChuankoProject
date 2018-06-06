@@ -4,12 +4,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".activity.MainActivity"
-    tools:layout_editor_absoluteY="25dp">
+    tools:context=".activity.FingerActivity">
 <LinearLayout
+    android:id="@+id/ll_finger"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_centerInParent="true"
+    android:layout_alignParentTop="true"
     android:orientation="horizontal">
 
     <Button
@@ -17,7 +17,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:onClick="OnClickBtnRegister"
-        android:layout_margin="50dp"
+        android:layout_margin="20dp"
         android:text="注册"
        />
 
@@ -26,7 +26,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:onClick="OnClickBtnIdentify"
-        android:layout_margin="50dp"
+        android:layout_margin="20dp"
         android:text="验证" />
 
 
@@ -35,16 +35,32 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:onClick="OnWhileIdentify2"
-        android:layout_margin="50dp"
+        android:layout_margin="20dp"
         android:text="循环读取" />
 
 </LinearLayout>
-
-
     <TextView
         android:id="@+id/textView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="20sp"
+        android:layout_below="@+id/ll_finger"/>
+
+    <TextView
+        android:id="@+id/code_title"
+        android:layout_below="@+id/textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="20sp"
-        android:layout_alignParentBottom="true"/>
+        android:text="获取到的二维码："/>
+
+    <TextView
+        android:id="@+id/tv_finger_code"
+        android:textSize="20sp"
+        android:layout_below="@+id/code_title"
+        android:textColor="@color/colorAccent"
+        android:layout_width="match_parent"
+        android:text="123456789"
+        android:layout_height="30dp" />
+
 </RelativeLayout>

@@ -14,7 +14,7 @@
  * limitations under the License. 
  */
 
-package android_serialport_api;
+package WedoneBioVein;
 
 import android.util.Log;
 

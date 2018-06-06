@@ -30,7 +30,7 @@ import java.util.Iterator;
 import java.util.Vector;
 
 import android_serialport_api.SerialPort;
-import android_serialport_api.SerialPortFinder;
+
 
 class BioVeinDevice{
     //常熟变量

@@ -1,10 +1,7 @@
 package com.shuli.root.chuankoproject.activity;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Message;
-import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -12,23 +9,26 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+//import com.bjw.bean.ComBean;
+//import com.bjw.utils.FuncUtil;
+//import com.bjw.utils.SerialHelper;
+import com.bjw.bean.ComBean;
+import com.bjw.utils.FuncUtil;
+import com.bjw.utils.SerialHelper;
 import com.google.gson.Gson;
 import com.shuli.root.chuankoproject.R;
-import com.shuli.root.chuankoproject.util.MyUtil;
 import com.shuli.root.chuankoproject.util.SoundPoolUtil;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.util.Arrays;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import WedoneBioVein.SdkMain;
 import WedoneBioVein.UserData;
 import WedoneBioVein.VeinMatchCaller;
+import android_serialport_api.SerialPortFinder;
 import okhttp3.MediaType;
-import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
 import retrofit.Api;
 import retrofit.ConnectUrl;
@@ -37,8 +37,9 @@ import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 import static java.lang.Thread.sleep;
 
-public class MainActivity extends AppCompatActivity {
+public class FingerActivity extends AppCompatActivity {
     private SdkMain mSdkMain = null;
+    List<UserData> mRegUserDatalist = new ArrayList<>();
     UserData mRegUserData = new UserData(); //用于保存采集(注册)的模板
     UserData mAIUserData = new UserData(); //用于保存验证时通过自动学习生成的模板，在比对时也作为比对模板的一部分
     int mUserCnt = 0;
@@ -48,8 +49,7 @@ public class MainActivity extends AppCompatActivity {
     byte[][] mVeinDevIdList = null;
     int mVeinDevCnt = 0;
 
-    private TextView textView;
-
+    private TextView textView,tv_code;
     Handler handler = new Handler(){
         @Override
         public void handleMessage(Message msg) {
@@ -57,13 +57,22 @@ public class MainActivity extends AppCompatActivity {
             textView.setText((CharSequence) msg.obj);
         }
     };
+
+    //二维码部分
+    private String code = "";
+    private SerialPortFinder serialPortFinder;
+    private SerialHelper serialHelper;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_finger);
         textView = findViewById(R.id.textView);
+        tv_code = findViewById(R.id.tv_finger_code);
         InitOperations();
         doBtnEnumDevice();
+        iniview2();
+        //new readThread().start();//开始串口的监听线程
     }
 
     //初始化
@@ -192,10 +201,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         doCloseDevice();
+        serialHelper.close();
     }
-
-
-
 
     //注册1根手指(3次)按钮
     public void OnClickBtnRegister(View v) {
@@ -324,14 +331,14 @@ public class MainActivity extends AppCompatActivity {
                         handler.postDelayed(runnable, 1000);
                         // TODO: 2018/4/18 将获取到的模板数组上传服务器
                         byte[] regTemplateData = mRegUserData.TemplateData(); //获取注册采集的特征数据
-
-                        MessageFinger messageFinger = new MessageFinger();
-                        messageFinger.setRegTemplateData(regTemplateData);
-                        messageFinger.setName("xxxxx");
-                        Gson gson = new Gson();
-                        String postInfoStr = gson.toJson(messageFinger);
-                        Log.i("sss","postInfoStr" + postInfoStr);
-                        upload(postInfoStr);
+                        mRegUserDatalist.add(mRegUserData);
+//                        MessageFinger messageFinger = new MessageFinger();
+//                        messageFinger.setRegTemplateData(regTemplateData);
+//                        messageFinger.setName("xxxxx");
+//                        Gson gson = new Gson();
+//                        String postInfoStr = gson.toJson(messageFinger);
+//                        Log.i("sss","postInfoStr" + postInfoStr);
+//                        upload(postInfoStr);
 
                         break; //采集完成3个有效模板，则结束采集
                     }
@@ -404,38 +411,42 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 /////////////////
+                for(int i = 0;i<mRegUserDatalist.size();i++){
 
-                int regTemplateCnt = mRegUserData.GetTemplateNum();
-                int aiTemplateCnt = mAIUserData.GetTemplateNum();
-                byte[] regTemplateData = mRegUserData.TemplateData(); //获取注册采集的特征数据
-                byte[] aiTemplateData = mAIUserData.TemplateData(); //获取AI自学习的特征数据
-                byte[] aiTemplateBuff = new byte[UserData.D_USER_TEMPLATE_SIZE*3]; //准备3个模板大小的缓冲区用于自动学习
-                byte[] mergeTemplateData = mergeBytes(regTemplateData, aiTemplateData); //把注册时采集的特征数据和AI自学习的数据合并起来验证
-                byte securityLevel = 4;
-                int[] diff = new int[1];
-                int[] AIDataLen = new int[1];
-                diff[0] = 10000;
-                AIDataLen[0] = UserData.D_USER_TEMPLATE_SIZE*3;
-                SdkMain.DebugStringPrint("指静脉比对:regTemplateCnt=" + regTemplateCnt + ",aiTemplateCnt=" + aiTemplateCnt);
-                //Wedone: 调用静脉特征值比对接口进行比对，各个参数意义如下说明
-                retVal = VeinMatchCaller.FvmMatchFeature(featureData, //采集的用于验证的指静脉特征值
-                        mergeTemplateData, //包含注册的特征值+AI自学习的特征值数据
-                        (byte) (regTemplateCnt + aiTemplateCnt), //第二个参数的比对特征值的个数，包含注册+AI自学习的特征值个数
-                        (byte) 0x03, //加密方式，当前请固定为3
-                        securityLevel, //比对时使用的安全级别， 1:1场景：范围[6-10],建议值为6，1:N场景：范围[1-5],建议值为4
-                        diff, //用于返回比对结果的差异度值
-                        aiTemplateBuff, //用于输出比对时自动学习生成的特征数据
-                        AIDataLen); //输入时初始化值为学习缓冲区的大小，验证通过返回时为学习成功的数据长度
-                if(SdkMain.FV_ERRCODE_SUCCESS != retVal){
-                    DisplayNoticeMsg("验证失败！！！", 0);
-                    return;
+
+              //  int regTemplateCnt = mRegUserData.GetTemplateNum();
+                    int regTemplateCnt = mRegUserDatalist.get(i).GetTemplateNum();
+                    int aiTemplateCnt = mAIUserData.GetTemplateNum();
+                    byte[] regTemplateData = mRegUserData.TemplateData(); //获取注册采集的特征数据
+                    byte[] aiTemplateData = mAIUserData.TemplateData(); //获取AI自学习的特征数据
+                    byte[] aiTemplateBuff = new byte[UserData.D_USER_TEMPLATE_SIZE*3]; //准备3个模板大小的缓冲区用于自动学习
+                    byte[] mergeTemplateData = mergeBytes(regTemplateData, aiTemplateData); //把注册时采集的特征数据和AI自学习的数据合并起来验证
+                    byte securityLevel = 4;
+                    int[] diff = new int[1];
+                    int[] AIDataLen = new int[1];
+                    diff[0] = 10000;
+                    AIDataLen[0] = UserData.D_USER_TEMPLATE_SIZE*3;
+                    SdkMain.DebugStringPrint("指静脉比对:regTemplateCnt=" + regTemplateCnt + ",aiTemplateCnt=" + aiTemplateCnt);
+                    //Wedone: 调用静脉特征值比对接口进行比对，各个参数意义如下说明
+                    retVal = VeinMatchCaller.FvmMatchFeature(featureData, //采集的用于验证的指静脉特征值
+                            mergeTemplateData, //包含注册的特征值+AI自学习的特征值数据
+                            (byte) (regTemplateCnt + aiTemplateCnt), //第二个参数的比对特征值的个数，包含注册+AI自学习的特征值个数
+                            (byte) 0x03, //加密方式，当前请固定为3
+                            securityLevel, //比对时使用的安全级别， 1:1场景：范围[6-10],建议值为6，1:N场景：范围[1-5],建议值为4
+                            diff, //用于返回比对结果的差异度值
+                            aiTemplateBuff, //用于输出比对时自动学习生成的特征数据
+                            AIDataLen); //输入时初始化值为学习缓冲区的大小，验证通过返回时为学习成功的数据长度
+                    if(SdkMain.FV_ERRCODE_SUCCESS != retVal){
+                        DisplayNoticeMsg("验证失败！！！", 0);
+                        return;
+                    }
+                    //Wedone：验证通过，并且返回的AI学习缓冲区的数据长度大于0，保存AI学习的数据
+                    if(0 < AIDataLen[0]){
+                        mAIUserData.ClearData();
+                        mAIUserData.SetTemplateData(aiTemplateBuff, (short)AIDataLen[0]);
+                    }
+                    DisplayNoticeMsg("验证通过！差异度=" + diff[0] + "，学习数据长度=" + AIDataLen[0], 0);
                 }
-                //Wedone：验证通过，并且返回的AI学习缓冲区的数据长度大于0，保存AI学习的数据
-                if(0 < AIDataLen[0]){
-                    mAIUserData.ClearData();
-                    mAIUserData.SetTemplateData(aiTemplateBuff, (short)AIDataLen[0]);
-                }
-                DisplayNoticeMsg("验证通过！差异度=" + diff[0] + "，学习数据长度=" + AIDataLen[0], 0);
             }
         }).start();
         return;
@@ -646,6 +657,51 @@ public class MainActivity extends AppCompatActivity {
                                }
                            }
                 );
+    }
+
+    private void iniview2() {
+
+        serialPortFinder = new SerialPortFinder();
+        serialHelper = new SerialHelper() {
+            @Override
+            protected void onDataReceived(final ComBean comBean) {
+//                Log.i("sss",FuncUtil.ByteArrToHex(comBean.bRec));
+                String str = new String(comBean.bRec);
+           //     Log.i("sss","xxxxx " + str);
+                    String s = str.substring(str.length() - 1, str.length());
+                    if (s.equals("\n")) {
+                        s = str.substring(0, str.length() - 1);
+                        code = code + s;
+                        if(code.contains("\n")){
+                            int num = code.indexOf("\n");
+                            code = code.substring(0,num);
+                        }
+
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                Log.i("sss",code);
+                                tv_code.setText(code);
+                                code = "";
+
+                            }
+                        });
+
+                    } else {
+                        code += str;
+                    }
+            }
+        };
+        serialHelper.setPort("/dev/ttyS1");
+        serialHelper.setBaudRate("9600");
+
+        if(!serialHelper.isOpen()){
+            try {
+                serialHelper.open();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
 }
